@@ -17,6 +17,7 @@ def provide_insights() -> dict:
 
 
 root_agent = Agent(
+    model='gemini-2.5-flash',
     name="metrics_insight_agent",
     description="Synthesizes operational KPIs, surfacing systemic issues (e.g., recurring part shortages or dealer training gaps).",
     tools=[

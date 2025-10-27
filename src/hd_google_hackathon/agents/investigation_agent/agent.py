@@ -21,12 +21,13 @@ def compare_with_standards(data: dict) -> dict:
     return {"status": "success", "anomalies": []}
 
 def propose_resolution(anomalies: list) -> dict:
-    """Proposes resolutions for the flagged anomalies.""""
+    """Proposes resolutions for the flagged anomalies."""
     # Placeholder implementation
     return {"status": "success", "resolution": "No resolution needed."}
 
 
 root_agent = Agent(
+    model='gemini-2.5-flash',
     name="investigation_agent",
     description="Pulls order history, production status, shipment telemetry; compares against standards to flag anomalies and propose resolutions.",
     tools=[

@@ -17,6 +17,7 @@ def suggest_knowledge_article(topic: str) -> dict:
 
 
 root_agent = Agent(
+    model='gemini-2.5-flash',
     name="playbook_author_agent",
     description="Summarizes resolved cases into reusable playbooks, flags gaps in documentation, suggests knowledge articles.",
     tools=[

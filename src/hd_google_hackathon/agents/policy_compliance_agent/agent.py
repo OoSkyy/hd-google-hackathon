@@ -17,6 +17,7 @@ def check_data_sharing_agreements(action: str) -> dict:
 
 
 root_agent = Agent(
+    model='gemini-2.5-flash',
     name="policy_compliance_agent",
     description="Checks suggested actions against regional rules, warranty terms, data-sharing agreements before execution.",
     tools=[
