@@ -7,8 +7,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-sys.path.append("C:\\Users\\k.bataeva\\Projects\\hd-google-hackathon")
-
 
 from hd_google_hackathon.agents.support_triage_agent.agent import create_agent as create_support_triage_agent
 from hd_google_hackathon.agents.investigation_agent.agent import create_agent as create_investigation_agent
@@ -32,20 +30,27 @@ templates = Jinja2Templates(directory="templates")
 MESSAGE_TEMPLATES = {
     "dealer": '''
         <div class="chat-message persona">
-            <div class="message-content">{message}</div>
-            <div class="timestamp">{timestamp}</div>
+            <div class="avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="message-content">
+                <div class="message-bubble">{message}</div>
+                <div class="timestamp">{timestamp}</div>
+            </div>
         </div>
     ''',
     "system": '''
         <div class="chat-message system">
-            <div class="message-content">{message}</div>
-            <div class="timestamp">{timestamp}</div>
+            <div class="message-content">
+                <div class="message-bubble">{message}</div>
+            </div>
         </div>
     ''',
     "agent": '''
         <div class="chat-message entity">
-            <div class="message-content"><b>{agent_name}:</b> {message}</div>
-            <div class="timestamp">{timestamp}</div>
+            <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+            <div class="message-content">
+                <div class="message-bubble"><b>{agent_name}:</b> {message}</div>
+                <div class="timestamp">{timestamp}</div>
+            </div>
         </div>
     ''',
 }
@@ -79,11 +84,13 @@ async def successful_new_order_flow(configuration_agent, runner_wrapper):
     options = {"items": new_order.items}
     prompt = f"Validate configuration with options {options} for tenant 'dealer_1'"
 
-    validation_result = runner.run_and_get_tool_output(prompt, "validate_configuration")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Validating configuration for order #{new_order.id}...", timestamp=timestamp)
+    validation_result = await runner.run_and_get_tool_output(prompt, "validate_configuration")
     if validation_result and validation_result.get("valid"):
-        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Running validation for order #{new_order.id}... SUCCESS: Configuration is valid.", timestamp=timestamp)
+        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Validation result: SUCCESS - configuration is valid.", timestamp=timestamp)
     else:
-        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Running validation for order #{new_order.id}... FAILURE: {validation_result.get('reason', 'Unknown reason')}", timestamp=timestamp)
+        failure_reason = (validation_result or {}).get("reason", "Unknown reason")
+        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Validation result: FAILURE - {failure_reason}", timestamp=timestamp)
     
     # 3. System updates order status
     order_repository.update_order_status(new_order.id, "in_progress", "dealer_1")
@@ -122,16 +129,17 @@ async def component_out_of_stock_flow(investigation_agent, runner_wrapper):
 
     for component_id in product.components:
         prompt = f"Check stock for component '{component_id}' for tenant 'dealer_1'"
-        stock_check_result = runner.run_and_get_tool_output(prompt, "check_component_stock")
-        stock_level = stock_check_result.get("stock", -1)
+        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message=f"Checking stock for component '{component_id}'...", timestamp=timestamp)
+        stock_check_result = await runner.run_and_get_tool_output(prompt, "check_component_stock")
+        stock_level = (stock_check_result or {}).get("stock", -1)
         if stock_level == 0:
-            yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message=f"Checking stock for component '{component_id}'... FAILURE: Component is out of stock.", timestamp=timestamp)
+            yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message=f"Stock check result: FAILURE - component '{component_id}' is out of stock.", timestamp=timestamp)
             # 3. System puts the order on hold
             order_repository.update_order_status(new_order.id, "on_hold", "dealer_1")
             yield MESSAGE_TEMPLATES["system"].format(message=f"Order #{new_order.id} status updated to 'on_hold'. An alert has been raised for the planner.", timestamp=timestamp)
             break
         else:
-            yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message=f"Checking stock for component '{component_id}'... SUCCESS: {stock_level} units in stock.", timestamp=timestamp)
+            yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message=f"Stock check result: SUCCESS - {stock_level} units of '{component_id}' available.", timestamp=timestamp)
 
 async def damaged_product_flow(support_triage_agent, investigation_agent, policy_compliance_agent, playbook_author_agent, runner_wrapper):
     """Runs the flow for handling a damaged product claim, involving multiple agents for triage, investigation, compliance, and knowledge capture."""
@@ -145,16 +153,19 @@ async def damaged_product_flow(support_triage_agent, investigation_agent, policy
     yield MESSAGE_TEMPLATES["dealer"].format(message=f"INCOMING CLAIM from 'David': {dealer_request}", timestamp=timestamp)
 
     # 2. Automated Triage & Enrichment (Support Triage Agent)
-    classification = support_triage_runner.run_and_get_tool_output(f"Classify this request: {dealer_request}", "classify_request_tools")
-    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Support Triage Agent", message=f"Intent: '{classification.get('intent', 'Unknown')}'.", timestamp=timestamp)
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Support Triage Agent", message="Classifying incoming claim...", timestamp=timestamp)
+    classification = await support_triage_runner.run_and_get_tool_output(f"Classify this request: {dealer_request}", "classify_request_tools")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Support Triage Agent", message=f"Intent detected: '{(classification or {}).get('intent', 'Unknown')}'.", timestamp=timestamp)
 
     # 3. Automated Investigation (Investigation Agent)
-    order_history = investigation_runner.run_and_get_tool_output("Pull history for order #order_1", "pull_order_history")
-    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message=f"Pulling history for order #order_1... SUCCESS: {order_history.get('history', 'Unknown')}", timestamp=timestamp)
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message="Pulling order history for investigation...", timestamp=timestamp)
+    order_history = await investigation_runner.run_and_get_tool_output("Pull history for order #order_1", "pull_order_history")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Investigation Agent", message=f"Order history retrieved: {(order_history or {}).get('history', 'Unknown')}", timestamp=timestamp)
 
     # 5. Automated Knowledge Capture (Playbook Author Agent)
-    playbook = playbook_author_runner.run_and_get_tool_output("Summarize case claim_123", "summarize_case")
-    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Playbook Author Agent", message=f"{playbook.get('playbook', 'Unknown')}", timestamp=timestamp)
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Playbook Author Agent", message="Summarizing the case for the knowledge base...", timestamp=timestamp)
+    playbook = await playbook_author_runner.run_and_get_tool_output("Summarize case claim_123", "summarize_case")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Playbook Author Agent", message=f"{(playbook or {}).get('playbook', 'Unknown')}", timestamp=timestamp)
 
 async def proactive_maintenance_flow(metrics_insight_agent, runner_wrapper):
     """Runs the flow for proactive maintenance, where the system predicts a future failure and notifies the dealer."""
@@ -165,8 +176,9 @@ async def proactive_maintenance_flow(metrics_insight_agent, runner_wrapper):
     yield MESSAGE_TEMPLATES["system"].format(message="The Metrics & Insight Agent runs its scheduled analysis of field data.", timestamp=timestamp)
 
     # 2. The agent identifies a product with a high risk of failure.
-    prediction = runner.run_and_get_tool_output("Predict maintenance needs for tenant dealer_1", "predict_maintenance_needs")
-    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Metrics & Insight Agent", message=f"ANALYSIS COMPLETE: {prediction.get('prediction', 'Unknown')}", timestamp=timestamp)
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Metrics & Insight Agent", message="Analyzing recent telemetry for maintenance risks...", timestamp=timestamp)
+    prediction = await runner.run_and_get_tool_output("Predict maintenance needs for tenant dealer_1", "predict_maintenance_needs")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Metrics & Insight Agent", message=f"Analysis complete: {(prediction or {}).get('prediction', 'Unknown')}", timestamp=timestamp)
 
     # 3. The agent proactively notifies the dealer.
     yield MESSAGE_TEMPLATES["dealer"].format(message=f"Proactive alert sent to dealer 'David': {prediction.get('recommendation', 'Unknown')}", timestamp=timestamp)
@@ -181,15 +193,18 @@ async def complex_product_configuration_flow(configuration_agent, runner_wrapper
     config_options = {"fabric": "fabric_1", "headrail": "headrail_1", "motorized": True, "quantity": 2}
 
     # 2. The Configuration Agent guides David through the options.
-    validation_result = runner.run_and_get_tool_output(f"Validate configuration with options {config_options} for tenant 'dealer_1'", "validate_configuration")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Validating configuration: {config_options}...", timestamp=timestamp)
+    validation_result = await runner.run_and_get_tool_output(f"Validate configuration with options {config_options} for tenant 'dealer_1'", "validate_configuration")
     if validation_result and validation_result.get("valid"):
-        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Validating configuration: {config_options}... SUCCESS: Configuration is valid.", timestamp=timestamp)
+        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message="Validation result: SUCCESS - configuration is valid.", timestamp=timestamp)
         # 3. The agent generates a quote.
-        quote = runner.run_and_get_tool_output(f"Generate quote for config {config_options} for tenant 'dealer_1'", "generate_quote")
-        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Configuration is valid. Quote: {quote.get('quote', 'Unknown')}", timestamp=timestamp)
+        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message="Generating quote based on validated configuration...", timestamp=timestamp)
+        quote = await runner.run_and_get_tool_output(f"Generate quote for config {config_options} for tenant 'dealer_1'", "generate_quote")
+        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Quote prepared: {(quote or {}).get('quote', 'Unknown')}", timestamp=timestamp)
         yield MESSAGE_TEMPLATES["dealer"].format(message="Dealer 'David' confirms the order.", timestamp=timestamp)
     else:
-        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Validating configuration: {config_options}... FAILURE: {validation_result.get('reason', 'Unknown reason')}", timestamp=timestamp)
+        failure_reason = (validation_result or {}).get("reason", "Unknown reason")
+        yield MESSAGE_TEMPLATES["agent"].format(agent_name="Configuration Agent", message=f"Validation result: FAILURE - {failure_reason}", timestamp=timestamp)
 
 async def dealer_onboarding_flow(onboarding_agent, runner_wrapper):
     """Runs the automated onboarding flow for a new dealer."""
@@ -204,16 +219,19 @@ async def dealer_onboarding_flow(onboarding_agent, runner_wrapper):
 
     # 2. The Onboarding Agent initiates the process.
     yield MESSAGE_TEMPLATES["system"].format(message="AI Opportunity: The Onboarding Agent automates the initial setup.", timestamp=timestamp)
-    training = runner.run_and_get_tool_output(f"Provide training materials for dealer: {new_dealer_info}", "provide_training_materials")
-    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message=f"{training.get('materials', 'Unknown')}", timestamp=timestamp)
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message="Preparing tailored training materials...", timestamp=timestamp)
+    training = await runner.run_and_get_tool_output(f"Provide training materials for dealer: {new_dealer_info}", "provide_training_materials")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message=f"{(training or {}).get('materials', 'Unknown')}", timestamp=timestamp)
 
     # 3. The agent sets up the account.
-    account_setup = runner.run_and_get_tool_output(f"Set up account for dealer: {new_dealer_info}", "setup_account")
-    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message=f"{account_setup.get('message', 'Unknown')}", timestamp=timestamp)
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message="Setting up dealer account...", timestamp=timestamp)
+    account_setup = await runner.run_and_get_tool_output(f"Set up account for dealer: {new_dealer_info}", "setup_account")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message=f"{(account_setup or {}).get('message', 'Unknown')}", timestamp=timestamp)
 
     # 4. The agent schedules a follow-up.
-    follow_up = runner.run_and_get_tool_output(f"Schedule follow-up for dealer: {new_dealer_info}", "schedule_follow_up")
-    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message=f"{follow_up.get('message', 'Unknown')}", timestamp=timestamp)
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message="Scheduling follow-up touchpoint...", timestamp=timestamp)
+    follow_up = await runner.run_and_get_tool_output(f"Schedule follow-up for dealer: {new_dealer_info}", "schedule_follow_up")
+    yield MESSAGE_TEMPLATES["agent"].format(agent_name="Onboarding Agent", message=f"{(follow_up or {}).get('message', 'Unknown')}", timestamp=timestamp)
 
     yield MESSAGE_TEMPLATES["system"].format(message="Flow 7 execution complete.", timestamp=timestamp)
 
@@ -231,10 +249,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 
-def get_flows():
-    with open("flows.md", "r") as f:
-        content = f.read()
-    return re.findall(r"## (\d+\..*?):\s(.*?)\n(.*?)(?:### AI Opportunities(.*?))?(?:\n## |\Z)", content, re.DOTALL)
+from hd_google_hackathon.flows import FLOWS
 
 
 icon_mapping = {
@@ -249,13 +264,17 @@ icon_mapping = {
 
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
-    flows = get_flows()
     tiles = ""
-    for flow in flows:
-        flow_id = int(flow[0].split(".")[0])
-        flow_title = flow[1]
+    for flow in FLOWS:
+        flow_id = flow["id"]
+        flow_title = flow["title"]
         icon_class = icon_mapping.get(flow_id, "fa-solid fa-question-circle")
-        tiles += f'<div class="tile" hx-get="/flow-events/{flow_id}" hx-target="#chat-container" hx-ext="sse"><i class="{icon_class}"></i>{flow_title}</div>'
+        tiles += f'''<div class="tile" hx-get="/flow-events/{flow_id}" hx-target="#chat-container" hx-ext="sse" sse-swap="description,message" hx-swap="beforeend">
+            <i class="{icon_class}"></i>
+            <div class="tile-content">
+                <h4>{flow_title}</h4>
+            </div>
+        </div>'''
     return templates.TemplateResponse("index.html", {"request": request, "tiles": tiles})
 
 
@@ -267,15 +286,20 @@ class RunnerWrapper:
         self._agent = agent
         self._runner = None
         self._session = None
+        self._lock = asyncio.Lock()
 
     async def setup(self):
         self._runner = InMemoryRunner(agent=self._agent, app_name="agents")
         self._session = await self._runner.session_service.create_session(app_name="agents", user_id="test_user")
         return self
 
-    def run_and_get_tool_output(self, prompt, tool_name):
+    async def run_and_get_tool_output(self, prompt, tool_name):
         if not self._runner or not self._session:
             raise Exception("RunnerWrapper not set up. Call setup() before using.")
+        async with self._lock:
+            return await asyncio.to_thread(self._run_and_get_tool_output_sync, prompt, tool_name)
+
+    def _run_and_get_tool_output_sync(self, prompt, tool_name):
         events = []
         for event in self._runner.run(
             user_id=self._session.user_id,
@@ -283,7 +307,7 @@ class RunnerWrapper:
             new_message=types.Content(role="user", parts=[types.Part.from_text(text=prompt)]),
         ):
             events.append(event)
-        
+
         tool_output = None
         for event in events:
             if isinstance(event, dict):
@@ -312,16 +336,26 @@ async def flow_events(flow_id: int):
         return
 
     async def event_generator():
-        flows = get_flows()
-        flow_data = next((flow for flow in flows if int(flow[0].split(".")[0]) == flow_id), None)
+        flow_data = next((flow for flow in FLOWS if flow["id"] == flow_id), None)
         if flow_data:
-            ai_opportunities = flow_data[3].strip()
-            opportunities = re.findall(r"\* \*\*(.*?):\*\* (.*?)(?=\n\*|\Z)", ai_opportunities, re.DOTALL)
-            opportunities_html = "".join([f"<li><strong>{title}:</strong> {desc.strip()}</li>" for title, desc in opportunities])
-            yield f'data: {json.dumps({"event": "description", "data": f"<h4>AI Opportunities</h4><ul>{opportunities_html}</ul>"})}\n\n'
+            flow_description = flow_data["description"]
+            ai_opportunities = flow_data["ai_opportunities"]
+            opportunities_html = "".join([f"<li><strong>{opp['title']}:</strong> {opp['description']}</li>" for opp in ai_opportunities])
+            description_html = f'''<div id="flow-description" hx-swap-oob="true">
+                <p>{flow_description}</p>
+                <h4>AI Opportunities</h4>
+                <ul>{opportunities_html}</ul>
+            </div>'''
+            yield f"event: description\ndata: {description_html}\n\n"
+
+            start_message = MESSAGE_TEMPLATES["system"].format(
+                message=f"Starting Flow {flow_data['id']}: {flow_data['title']}",
+                timestamp=datetime.datetime.now().strftime("%H:%M:%S"),
+            )
+            yield f"event: message\ndata: {start_message}\n\n"
 
         async for message in flow_function(*agents, runner_wrapper):
-            yield f'data: {json.dumps({"event": "message", "data": message})}\n\n'
+            yield f"event: message\ndata: {message}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
