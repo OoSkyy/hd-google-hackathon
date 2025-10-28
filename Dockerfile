@@ -11,23 +11,12 @@ RUN apt-get update \
     && apt-get install -yq --no-install-recommends build-essential git curl \
     && rm -rf /var/lib/apt/lists/*
 
+# install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY pyproject.toml uv.lock* ./
+RUN uv sync --no-cache --no-dev
 # Copy the full repository into the image so pip can build the package
 COPY . /app/
-
-# Use pip to install the project dependencies (adk) from pyproject
-# Generate a temporary requirements file from pyproject.toml in a portable way
-# Use --no-cache-dir to reduce image size and be explicit about upgrades
-RUN pip install --no-cache-dir -U pip setuptools wheel \
-    && python - <<'PY'
-import tomllib
-data = tomllib.loads(open('pyproject.toml','r',encoding='utf-8').read())
-deps = data.get('project',{}).get('dependencies',[])
-open('requirements-build.txt','w').write('\n'.join(deps))
-PY
-
-RUN if [ -s requirements-build.txt ]; then pip install --no-cache-dir -r requirements-build.txt; fi \
-    && pip install --no-cache-dir -e . \
-    && rm -f requirements-build.txt
 
 # Create a persistent data directory; run DB seeding at container startup (not at build)
 RUN mkdir -p /data
@@ -41,4 +30,4 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 # Default command: start the ADK web dev UI (entrypoint will run seeding first)
-CMD ["adk", "web", "src/hd_google_hackathon/agents", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/bin/sh", "-lc", "uv run uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]
