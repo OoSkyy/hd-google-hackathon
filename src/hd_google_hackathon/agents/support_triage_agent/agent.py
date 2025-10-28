@@ -1,14 +1,24 @@
 import os
-import json
-import logging
+import re
+
 from dotenv import load_dotenv
-
-from google.adk.agents import Agent
-from google import genai
 from pydantic import BaseModel, Field
-from google.genai import types
 
-# from utils import SYSTEM_PROMPT_AFTERSALES, SYSTEM_PROMPT_QUOTES
+from google import genai
+from google.genai import types
+from google.adk.agents import Agent
+
+
+# Defaults and constants
+DEFAULT_MODEL = "gemini-2.0-flash"
+AFTERSALES_LABELS = {
+    "technical support",
+    "claims",
+    "parts request",
+    "field service / installation",
+}
+QUOTE_LABELS = {"pricing & quotes", "quotes", "pricing"}
+ORDER_REGEX = re.compile(r"\b[A-Z]*\d+-\d+\b")
 
 # System prompts for quote and aftersales triage agent
 
@@ -98,8 +108,8 @@ SYSTEM_PROMPT_AFTERSALES = """You are an assistant trained to classify email mes
                 - Order Number: `\b[A-Z]*\d+-\d+\b`
                 - Invoice Number does not have a specific regex, but it is usually a sequence of numbers. Try to infer.
 
-        2. The message contains a clear ACTION, which is request for Repair, New Delivery of Product, New Delivery of Parts, request for Service Engineer Visit OR the message contains a clear description of the issue, that allow us to understand what the customer is asking for.
-            - Return the ACTION you identified in the message as <Action>. One of the following: Repair, New Delivery of Product, New Delivery of Parts, Service Engineer Visit.
+        2. The message contains a clear description of the issue that allows us to understand what the customer is asking for.
+            - Do NOT infer a corrective action here. Only capture what the customer explicitly suggests (if any).
 
     - **Incomplete**: The message does not comply with any of the previous conditions.
         - Return the Suggestion based on what is missing in the message. For instance, if the message does not contain Order Number or Invoice Number, return "Ask the client to provide Order Number or Invoice Number." If the message does not contain a clear action or description of the issue, return "Ask the client for a clear description of the issue or a suggested action: New Delivery? Repair?.".
@@ -107,13 +117,14 @@ SYSTEM_PROMPT_AFTERSALES = """You are an assistant trained to classify email mes
     It is mandatory that the classification is done considering only one label. For instance, a label can be:
     'Complete' OR 'Incomplete';
     but a label could NEVER be 'Incomplete - Needs Review'.
-    If the Label is not 'Complete', you return the Action as empty ('').
+    If the Label is not 'Complete', you return the ClientActionSuggested as empty ('').
     If the Label is 'Complete', you return the Suggestion as empty ('').
     Additionally, please provide a short sentence, in English, with a summary of your reasoning on why you optioned for that label. Return it as Reasoning.
     The output is to be used in a complex automatic data flow, therefore you MUST respond **only** with a valid Python dictionary in the following format:
     {{
     "Label": "<Label>",
-    "Action": "<Action>",
+    "ClientActionSuggested": "<Repair|Send New Product|Send New Part of the Product|Send Service Engineer|''>",
+    "IssueDescription": "<Short issue description or ''>",
     "Suggestion": "<Suggestion>",
     "Reasoning": "<Reasoning>"
     }}
@@ -192,9 +203,10 @@ class Classification(BaseModel):
 
 
 class AftersalesTriage(BaseModel):
-    """The triage result."""
+    """Initial aftersales triage extraction (no action inference)."""
     label: str = Field(..., description="The triage label.")
-    action: str | None = Field(None, description="The action to be taken.")
+    client_action_suggested: str | None = Field(None, alias="ClientActionSuggested", description="Action explicitly requested by the customer (not inferred).")
+    issue_description: str | None = Field(None, alias="IssueDescription", description="Short description of the issue as stated by the customer.")
     suggestion: str | None = Field(None, description="A suggestion for the request.")
     reasoning: str = Field(..., description="The reasoning for the triage.")
 
@@ -208,7 +220,7 @@ class QuotesTriage(BaseModel):
 
 
 
-def classify_request_tools(user_prompt: str, model_name: str = "gemini-2.0-flash") -> dict:
+def classify_request_tools(user_prompt: str, model_name: str = DEFAULT_MODEL) -> dict:
     """Classifies the type of inbound request (e.g., Order, Technical Support, etc....)."""
 
     response = CLIENT.models.generate_content(
@@ -222,7 +234,7 @@ def classify_request_tools(user_prompt: str, model_name: str = "gemini-2.0-flash
     return Classification.model_validate_json(response.text)
 
 
-def aftersales_triage_tool(user_prompt: str, model_name: str = "gemini-2.0-flash") -> dict:
+def aftersales_triage_tool(user_prompt: str, model_name: str = DEFAULT_MODEL) -> dict:
     """Classifies and triages aftersales requests."""
 
     response = CLIENT.models.generate_content(
@@ -238,7 +250,54 @@ def aftersales_triage_tool(user_prompt: str, model_name: str = "gemini-2.0-flash
     return {}
 
 
-def quote_triage_tool(user_prompt: str, model_name: str = "gemini-2.0-flash") -> dict:
+# New: Corrective Action Inference tool for Aftersales
+SYSTEM_PROMPT_AFTERSALES_ACTION = """You are a support triage expert.
+Given a product context (if known) and a clear issue description, infer the single best corrective action from the allowed list.
+
+Allowed actions:
+- Repair
+- Send New Product
+- Send New Part of the Product
+- Send Service Engineer
+
+Instructions
+- Choose exactly one action that best addresses the described problem. Please pay attention to the details in the issue description. Try to identify if the product is beyond repair, if parts are missing, or if an on-site visit is needed.
+- If the issue description is unclear or missing, set NeedsMoreInfo = true and craft Ask with a concise question to clarify the issue.
+
+Output format (MANDATORY)
+Respond **only** with a valid Python dictionary exactly like:
+{
+  "Action": "<one of the allowed actions>",
+  "Reasoning": "<Very short justification>",
+  "NeedsMoreInfo": <true|false>,
+  "Ask": "<If NeedsMoreInfo is true, a short clarification question; else ''>"
+}
+"""
+
+
+class ActionDecision(BaseModel):
+    action: str = Field(..., alias="Action", description="Chosen corrective action.")
+    reasoning: str = Field(..., alias="Reasoning", description="Short justification.")
+    needs_more_info: bool = Field(..., alias="NeedsMoreInfo", description="Whether more information is needed.")
+    ask: str = Field(..., alias="Ask", description="Follow-up question if more info is needed.")
+
+
+def infer_corrective_action_tool(user_prompt: str, model_name: str = DEFAULT_MODEL) -> dict:
+    """Infers the corrective action for aftersales given product + issue description."""
+    response = CLIENT.models.generate_content(
+        model=model_name,
+        contents=[SYSTEM_PROMPT_AFTERSALES_ACTION, user_prompt],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=ActionDecision,
+        ),
+    )
+    if response.text:
+        return ActionDecision.model_validate_json(response.text)
+    return {}
+
+
+def quote_triage_tool(user_prompt: str, model_name: str = DEFAULT_MODEL) -> dict:
     """Classifies and triages quotes requests."""
 
     response = CLIENT.models.generate_content(
@@ -254,16 +313,88 @@ def quote_triage_tool(user_prompt: str, model_name: str = "gemini-2.0-flash") ->
     return {}
 
 
+# --- Consolidation tool: enforce straightforward structured output ---
+
+
+class ConsolidatedResponse(BaseModel):
+    classification_label: str = Field(..., alias="ClassificationLabel")
+    aftersales: dict | None = Field(None, alias="Aftersales")
+    quote: dict | None = Field(None, alias="Quote")
+
+
+def _extract_order_number(text: str) -> str | None:
+    m = ORDER_REGEX.search(text or "")
+    return m.group(0) if m else None
+
+
+def consolidate_support_triage(user_prompt: str, model_name: str = DEFAULT_MODEL) -> dict:
+    """Runs classification, triage, and returns a strict, straightforward JSON with required fields."""
+    # 1) Classify
+    cls = classify_request_tools(user_prompt, model_name=model_name)
+    classification_label = cls["label"] if isinstance(cls, dict) else getattr(cls, "label", "")
+
+    aftersales_out = None
+    quote_out = None
+
+    # 2) Branch
+    if classification_label.lower() in AFTERSALES_LABELS:
+        triage = aftersales_triage_tool(user_prompt, model_name=model_name)
+        label = triage.get("label") if isinstance(triage, dict) else getattr(triage, "label", "")
+
+        # Extract values
+        order_number = _extract_order_number(user_prompt)
+        claim = triage.get("issue_description") if isinstance(triage, dict) else getattr(triage, "issue_description", None)
+
+        corrective_action = None
+        if label and label.lower() == "complete" and claim:
+            # Infer corrective action using dedicated tool
+            action_ctx = f"Product/Context (if any) is in the message. Issue: {claim}"
+            action = infer_corrective_action_tool(action_ctx, model_name=model_name)
+            corrective_action = action.get("action") if isinstance(action, dict) else getattr(action, "action", None)
+
+        aftersales_out = {
+            "OrderNumber": order_number or "",
+            "Claim": claim or "",
+            "CorrectiveAction": corrective_action or "",
+        }
+
+    elif classification_label.lower() in QUOTE_LABELS:
+        triage = quote_triage_tool(user_prompt, model_name=model_name)
+        items = triage.get("items") if isinstance(triage, dict) else getattr(triage, "items", {})
+        # Normalize items dict -> list of {Item, Quantity}
+        norm_items = [{"Item": k, "Quantity": int(v)} for k, v in (items or {}).items()]
+        quote_out = {
+            "Items": norm_items,
+        }
+
+    result = ConsolidatedResponse(
+        ClassificationLabel=classification_label,
+        Aftersales=aftersales_out,
+        Quote=quote_out,
+    )
+    return result.model_dump(by_alias=True)
+
+
 def create_agent() -> Agent:
     return Agent(
-        model="gemini-2.0-flash",
+        model=DEFAULT_MODEL,
         name="support_triage_agent",
         description="Agent to classify and triage support requests into aftersales or quotes cases",
-        instruction="""Leverage the classify_request_tools tool to comeup with the correct label.
-                   the support request and triage accordingly. If the label is 'Pricing & Quotes', use the quote_triage_tool to triage the request.
-                   "If the label is anything related to Aftersales, like 'Technical Support' or 'Claims', use the aftersales_triage_tool to triage the request.
-                   Else, respond with a message indicating that the request did not need triaging.""",
-        tools=[classify_request_tools, aftersales_triage_tool, quote_triage_tool],
+        instruction="""Use classify_request_tools to pick the label and route.
+
+If 'Pricing & Quotes':
+- Call quote_triage_tool and read its JSON. If Label == 'Incomplete', immediately ask the user for the missing information per the Suggestion field (e.g., product names and numeric quantities). Do not proceed until the user provides. If Label == 'Complete', return the parsed Items and next steps.
+
+If Aftersales (e.g., 'Technical Support', 'Claims'):
+- First call aftersales_triage_tool to extract ONLY the client's suggested action (if any) and the issue description (no inference). If Label == 'Incomplete', ask the user to provide a clear description of the issue (symptoms, when it occurs, any error messages) and any identifier (order or invoice); do not infer an action.
+- If there is a clear issue description (i.e., Complete), call infer_corrective_action_tool with product (if known) and that description to choose a single corrective action.
+
+Finally, call consolidate_support_triage and respond ONLY with its JSON, which must include:
+- ClassificationLabel
+- If Aftersales: OrderNumber, Claim, CorrectiveAction
+- If Quotes: Items with {Item, Quantity}
+""",
+        tools=[classify_request_tools, aftersales_triage_tool, infer_corrective_action_tool, quote_triage_tool, consolidate_support_triage],
     )
 
 root_agent = create_agent()
