@@ -1,0 +1,430 @@
+{
+  "eval_set_id": "triageevalset",
+  "name": "triageevalset",
+  "eval_cases": [
+    {
+      "eval_id": "request-financial-document",
+      "conversation": [
+        {
+          "invocation_id": "e-b7858c7e-e3d3-4d5a-84b9-6fa28097ebd5",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Hello. Can I get access to the official invoice from order HD-122233? Could you please share the file?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "{\"ClassificationLabel\": \"Invoices & Payments\"}\n"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "invocation_events": [
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-7b37fea1-f382-4744-951a-56e6c6d4754c",
+                        "args": {
+                          "user_prompt": "Can I get access to the official invoice from order HD-122233? Could you please share the file?"
+                        },
+                        "name": "classify_request_tools"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-7b37fea1-f382-4744-951a-56e6c6d4754c",
+                        "name": "classify_request_tools",
+                        "response": {
+                          "result": {
+                            "label": "Invoices & Payments",
+                            "summary": "Customer requests invoice for order HD-122233.",
+                            "reasoning": "The customer is requesting an invoice, which falls under Invoices & Payments."
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-f3ed4235-8ea1-4160-85a7-813ed81157b9",
+                        "args": {
+                          "user_prompt": "Can I get access to the official invoice from order HD-122233? Could you please share the file?"
+                        },
+                        "name": "consolidate_support_triage"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-f3ed4235-8ea1-4160-85a7-813ed81157b9",
+                        "name": "consolidate_support_triage",
+                        "response": {
+                          "ClassificationLabel": "Invoices & Payments",
+                          "Aftersales": null,
+                          "Quote": null
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              }
+            ]
+          },
+          "creation_timestamp": 1761643463.142973
+        }
+      ],
+      "session_input": {
+        "app_name": "support_triage_agent",
+        "user_id": "user"
+      },
+      "creation_timestamp": 1761643489.5695817
+    },
+    {
+      "eval_id": "complete-aftersales1",
+      "conversation": [
+        {
+          "invocation_id": "e-1596e495-c8fd-4794-94e0-23a63c51f7d4",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Hello, my order number is HD-122345. My roller shade came 10cm smaller than specified in the project. Could you please help me out?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "```json\n{\n  \"ClassificationLabel\": \"Claims\",\n  \"OrderNumber\": \"HD-122345\",\n  \"Claim\": \"Roller shade came 10cm smaller than specified.\",\n  \"CorrectiveAction\": \"Send New Product\"\n}\n```"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "invocation_events": [
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-60f37ecf-a284-4124-bf4f-089086e1bc5e",
+                        "args": {
+                          "user_prompt": "Hello, my order number is HD-122345. My roller shade came 10cm smaller than specified in the project. Could you please help me out?"
+                        },
+                        "name": "aftersales_triage_tool"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-60f37ecf-a284-4124-bf4f-089086e1bc5e",
+                        "name": "aftersales_triage_tool",
+                        "response": {
+                          "result": {
+                            "label": "Complete",
+                            "client_action_suggested": "",
+                            "issue_description": "The roller shade came 10cm smaller than specified in the project.",
+                            "suggestion": "",
+                            "reasoning": "The message contains an order number and a clear description of the issue."
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-81f6d6f6-d3ef-40e4-8ca7-522278cab5b6",
+                        "args": {
+                          "user_prompt": "roller shade came 10cm smaller than specified in the project"
+                        },
+                        "name": "infer_corrective_action_tool"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-81f6d6f6-d3ef-40e4-8ca7-522278cab5b6",
+                        "name": "infer_corrective_action_tool",
+                        "response": {
+                          "result": {
+                            "action": "Send New Product",
+                            "reasoning": "The shade is significantly smaller than specified, indicating a manufacturing error or incorrect order fulfillment. Sending a replacement is the most direct solution.",
+                            "needs_more_info": false,
+                            "ask": ""
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-49e77f31-7435-4462-9f08-75a2e74649ac",
+                        "args": {
+                          "model_name": "gemini-2.0-flash",
+                          "user_prompt": "Hello, my order number is HD-122345. My roller shade came 10cm smaller than specified in the project."
+                        },
+                        "name": "consolidate_support_triage"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-49e77f31-7435-4462-9f08-75a2e74649ac",
+                        "name": "consolidate_support_triage",
+                        "response": {
+                          "ClassificationLabel": "Claims",
+                          "Aftersales": {
+                            "OrderNumber": "",
+                            "Claim": "Roller shade came 10cm smaller than specified.",
+                            "CorrectiveAction": "Send New Product"
+                          },
+                          "Quote": null
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              }
+            ]
+          },
+          "creation_timestamp": 1761643542.287317
+        }
+      ],
+      "session_input": {
+        "app_name": "support_triage_agent",
+        "user_id": "user"
+      },
+      "creation_timestamp": 1761643666.1081212
+    },
+    {
+      "eval_id": "complete-quote",
+      "conversation": [
+        {
+          "invocation_id": "e-f41ecb9f-d28a-4091-b469-42f0ff5770bf",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Could I please get the price for a set of 3 venetian blinds, 160x160cm and 2 duettes 160x180cm."
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "```json\n{\"ClassificationLabel\": \"Pricing & Quotes\", \"Items\": [{\"Item\": \"Venetian Blind\", \"Quantity\": 3}, {\"Item\": \"Duette Shade\", \"Quantity\": 2}]}\n```"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "invocation_events": [
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-e31080d7-63c5-4bf1-a5d4-17090c41c788",
+                        "args": {
+                          "user_prompt": "Could I please get the price for a set of 3 venetian blinds, 160x160cm and 2 duettes 160x180cm."
+                        },
+                        "name": "classify_request_tools"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-e31080d7-63c5-4bf1-a5d4-17090c41c788",
+                        "name": "classify_request_tools",
+                        "response": {
+                          "result": {
+                            "label": "Pricing & Quotes",
+                            "summary": "Customer requests pricing for venetian blinds and duettes.",
+                            "reasoning": "The customer is asking for the price of specific products, which falls under pricing and quotes."
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-3471fec0-3132-43de-88b0-5eec6034cb69",
+                        "args": {
+                          "user_prompt": "Could I please get the price for a set of 3 venetian blinds, 160x160cm and 2 duettes 160x180cm."
+                        },
+                        "name": "quote_triage_tool"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-3471fec0-3132-43de-88b0-5eec6034cb69",
+                        "name": "quote_triage_tool",
+                        "response": {
+                          "result": {
+                            "label": "Complete",
+                            "suggestion": "",
+                            "reasoning": "The email specifies Venetian Blind (3) and Duette Shade (2) with quantities.",
+                            "items": {
+                              "Venetian Blind": 3,
+                              "Duette Shade": 2
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "adk-fa9d9e0f-ef49-405a-a86d-f201c52c1333",
+                        "args": {
+                          "user_prompt": "Could I please get the price for a set of 3 venetian blinds, 160x160cm and 2 duettes 160x180cm."
+                        },
+                        "name": "consolidate_support_triage"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                }
+              },
+              {
+                "author": "support_triage_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "adk-fa9d9e0f-ef49-405a-a86d-f201c52c1333",
+                        "name": "consolidate_support_triage",
+                        "response": {
+                          "ClassificationLabel": "Pricing & Quotes",
+                          "Aftersales": null,
+                          "Quote": {
+                            "Items": [
+                              {
+                                "Item": "Venetian Blind",
+                                "Quantity": 3
+                              },
+                              {
+                                "Item": "Duette Shade",
+                                "Quantity": 2
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                }
+              }
+            ]
+          },
+          "creation_timestamp": 1761643731.199868
+        }
+      ],
+      "session_input": {
+        "app_name": "support_triage_agent",
+        "user_id": "user"
+      },
+      "creation_timestamp": 1761643767.7957015
+    }
+  ],
+  "creation_timestamp": 1761637405.4237685
+}
