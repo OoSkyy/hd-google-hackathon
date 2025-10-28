@@ -7,11 +7,9 @@ build
 .venv
 venv
 env
-.env
 .git
 tests/
 tests/*
 *.sqlite
 *.db
-vertex-ai-key.json
 secrets/
