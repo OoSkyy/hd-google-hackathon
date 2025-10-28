@@ -13,7 +13,7 @@ RUN apt-get update \
 
 # install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml uv.lock* README.md ./
 RUN uv sync --no-cache --no-dev
 # Copy the full repository into the image so pip can build the package
 COPY . /app/
