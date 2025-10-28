@@ -72,14 +72,15 @@ This flow describes how to handle an issue during the installation process.
 
 ---
 
-## 5. New Flow: Proactive Maintenance Alert
+## 5. New Flow: Maintenance Alert
 
 This flow describes how AI can predict and prevent product failures.
 
-1.  **System:** An AI agent monitors the age and usage data of products in the field.
-2.  **System:** The agent identifies a product with a high risk of a component failing soon.
-3.  **System:** The agent proactively notifies the dealer and suggests a preventative maintenance action.
-4.  **Persona:** `David` (Dealer) reviews and approves the action.
+1.  **Persona:** `David` Wants to check for a Customer how certain it is that his Product fails in the near future.
+2.  **Persona:** `David` Is not really sure which product the customer owns so he asks the AI to provide him with information about the available products to identify the correct one.
+3.  **System:** The agent informs David about the products an describe them in a Overview.
+4. **Persona:** David Identifies the correct product and tells the agent which id he means.
+5. **System:** Agent provides information how possible a failure is in the next time based on the data it has available.
 
 ### AI Opportunities
 

@@ -5,7 +5,10 @@ description = "Agentic platform that unifies dealer support workflows with orche
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.120.1",
     "google-adk",
+    "jinja2>=3.1.6",
+    "uvicorn>=0.38.0",
 ]
 
 [project.optional-dependencies]

@@ -220,18 +220,18 @@ async def test_damaged_product_flow(support_triage_agent, investigation_agent, p
     logging.info(f"[Playbook Author Agent]: {playbook['playbook']}")
 
 @pytest.mark.asyncio
-async def test_proactive_maintenance_flow(metrics_insight_agent, runner_wrapper):
-    """Tests the flow for proactive maintenance, where the system predicts a future failure and notifies the dealer."""
+async def test_maintenance_flow(metrics_insight_agent, runner_wrapper):
+    """Tests the flow for maintenance, where the system predicts a future failure and notifies the dealer."""
     runner = await runner_wrapper(metrics_insight_agent)
     # 1. The Metrics & Insight Agent monitors product data.
-    logging.info("The Metrics & Insight Agent runs its scheduled analysis of field data.")
+    logging.info("Dealer 'David' wants to check maintenance predictions for his products.")
 
     # 2. The agent identifies a product with a high risk of failure.
-    prediction = runner.run_and_get_tool_output("Predict maintenance needs for tenant dealer_1", "predict_maintenance_needs")
+    prediction = runner.run_and_get_tool_output("Predict maintenance needs for product Duette", "predict_maintenance_needs")
     logging.info(f"[Metrics & Insight Agent]: ANALYSIS COMPLETE: {prediction['prediction']}")
 
     # 3. The agent proactively notifies the dealer.
-    logging.info(f"Proactive alert sent to dealer 'David': {prediction['recommendation']}")
+    logging.info(f"Alert sent to dealer 'David': {prediction['recommendation']}")
 
 @pytest.mark.asyncio
 async def test_complex_product_configuration_flow(configuration_agent, runner_wrapper):

@@ -26,4 +26,12 @@ dealer_products = [
         brand_name="Hillary's Luminette",
         dealer_sku="SS-LUMIN-001"
     ),
+    # The Shade Store sells Silhouette as "SS Silhouette"
+    DealerProduct(
+        id="ss_silhouette",
+        product_id="silhouette",
+        dealer_id="dealer_1",
+        brand_name="The Shade Store Silhouette",
+        dealer_sku="SS-SIL-001"
+    ),
 ]

@@ -198,7 +198,7 @@ CLIENT = genai.Client(
 class Classification(BaseModel):
     """The classification of the request."""
     label: str = Field(..., description="The classification label.")
-    summary: str | None = Field(None, description="A summary of the request.")
+    summary: str = Field("", description="A summary of the request.")
     reasoning: str = Field(..., description="The reasoning for the classification.")
 
 

@@ -88,7 +88,6 @@ def get_products(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     rows = cur.fetchall()
     return [dict(id=r[0], sku=r[1], name=r[2], price_cents=r[3]) for r in rows]
 
-
 def get_orders_for_dealer(conn: sqlite3.Connection, dealer_id: str):
     cur = conn.cursor()
     cur.execute("SELECT id, status, created_at FROM orders WHERE dealer_id = ?", (dealer_id,))

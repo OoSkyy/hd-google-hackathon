@@ -88,3 +88,38 @@ class SqliteOrderRepository(OrderRepository):
 
     def update_shipment_priority(self, order_id: str, priority: str, tenant_id: str) -> Order | None:
         pass
+
+    def get_all_orders(self) -> List[Order]:
+        conn = connect_db(read_only=True)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT o.id, o.dealer_id, o.status, o.shipment_priority, o.history
+            FROM orders o
+        """)
+        order_rows = cur.fetchall()
+
+        orders = []
+        for row in order_rows:
+            order_id = row[0]
+            cur.execute("""
+                SELECT oi.dealer_product_id, oi.quantity
+                FROM order_items oi
+                WHERE oi.order_id = ?
+            """, (order_id,))
+            item_rows = cur.fetchall()
+            items = [OrderItem(dealer_product_id=item[0], quantity=item[1]) for item in item_rows]
+            
+            history_str = row[4]
+            history = json.loads(history_str) if history_str else []
+
+            orders.append(Order(
+                id=row[0],
+                dealer_id=row[1],
+                status=row[2],
+                shipment_priority=row[3],
+                items=items,
+                history=history,
+            ))
+        
+        conn.close()
+        return orders

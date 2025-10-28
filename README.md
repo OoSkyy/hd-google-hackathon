@@ -8,11 +8,33 @@ For a detailed description of the interaction flows, see [flows.md](flows.md).
 
 ```
 hd-google-hackathon/
-├── docs/                      # Design notes and architecture references
-├── tests/                     # Pytest suites mirroring src/ for coverage
-│   └── mocks/                 # Mock data and repositories for tests
-│   └── hd_google_hackathon/   # Runtime package (empty scaffold for now)
-└── tests/                     # Pytest suites mirroring src/ for coverage
+├── Dockerfile                  # Container image definition for the web demo + agents
+├── app.py                      # FastAPI + HTMX chat demo entrypoint
+├── data/
+│   └── mock.db                 # Seeded SQLite store backing the demo flows
+├── docker-compose.yml          # Local orchestration with live-reload volume mounts
+├── scripts/
+│   └── seed_mock_db.py         # Utility to reseed / refresh the mock database
+├── src/
+│   └── hd_google_hackathon/
+│       ├── agents/             # ADK agent implementations served via the web UI
+│       ├── data/               # Repositories and DB utilities over the mock store
+│       ├── domain/             # Domain models shared across agents
+│       ├── utils/              # Cross-cutting helpers (tooling, adapters)
+│       ├── config.py           # Centralized configuration and settings
+│       └── mock_db.py          # Mock data loader for local runs
+├── templates/
+│   └── index.html              # HTMX chat interface presented by app.py
+├── tests/
+│   ├── agents/                 # Agent-focused unit tests
+│   ├── flows/                  # Flow coverage scenarios
+│   ├── mocks/                  # Test doubles and fixture data
+│   ├── conftest.py             # Pytest fixtures and shared setup
+│   └── test_flows.py           # End-to-end conversation validation
+├── flows.md                    # Detailed breakdown of interaction flows
+├── gemini.md                   # Notes on Vertex/Gemini integration experiments
+├── pyproject.toml              # Project metadata and dependency declarations
+└── uv.lock                     # Resolved dependency lockfile
 ```
 
 Run `python main.py` for a quick smoke check, or `pytest` once additional tests are added (the suite exercises the mock data fixtures).
